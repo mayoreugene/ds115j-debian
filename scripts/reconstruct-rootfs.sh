@@ -15,7 +15,14 @@ set -- $PARTS
 }
 
 cat "$@" > "$OUT"
-ACTUAL=$(shasum -a 256 "$OUT" | awk '{print $1}')
+if command -v sha256sum >/dev/null 2>&1; then
+    ACTUAL=$(sha256sum "$OUT" | awk '{print $1}')
+elif command -v shasum >/dev/null 2>&1; then
+    ACTUAL=$(shasum -a 256 "$OUT" | awk '{print $1}')
+else
+    echo "Neither sha256sum nor shasum found" >&2
+    exit 1
+fi
 if [ "$ACTUAL" != "$EXPECTED" ]; then
     rm -f "$OUT"
     echo "Rootfs checksum mismatch: expected $EXPECTED, got $ACTUAL" >&2

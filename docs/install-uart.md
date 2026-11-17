@@ -80,7 +80,7 @@ Use `uRamdisk-hdd-ds115j` instead of recovery **only** when `sda1` already has a
 
 Do not boot `uImage-nodtb`.
 
-## 3. Partition the disk
+## 3. Partition and provision the disk
 
 You should now be in **BusyBox recovery** (or Linux if you used the HDD ramdisk). Confirm:
 
@@ -88,6 +88,29 @@ You should now be in **BusyBox recovery** (or Linux if you used the HDD ramdisk)
 cat /proc/partitions
 # expect sda
 ```
+
+### Fast-track: Automated single-command install (New or wipe disk)
+
+If you have started the HTTP server on your laptop (`scripts/reconstruct-rootfs.sh && python3 -m http.server 45152 --bind 0.0.0.0`), you can perform steps 3, 4, and 5 in **one single command** inside BusyBox recovery:
+
+```sh
+wget -qO- http://192.168.68.251:45152/scripts/provision-hdd.sh | sh
+```
+
+This automated script will:
+1. Create the correct 1 MiB-aligned MBR layout on `/dev/sda` (`sda1` 64G, `sda2` 128M, `sda3` rest).
+2. Format `sda1` (ext4 `rootfs`), `sda2` (ext2 `boot`), and `sda3` (ext4 `data`).
+3. Download and unpack `rootfs-trixie-armhf.tar.gz`.
+4. Install network bootstrap configs (`interfaces-bootstrap`, `10-ds115j-eth0.link`, `fstab`, `sources.list`).
+5. Install and verify SHA-256 hashes for `uImage-ds115j` and `uRamdisk-hdd-ds115j` on `sda2` (`ide 0:2`).
+
+Once finished, skip directly to [§6 First local boot](#6-first-local-boot-and-daily-ready-userspace).
+
+---
+
+### Manual step-by-step partition and install
+
+If you prefer to perform each step by hand or need to preserve `/srv/data` on `sda3`:
 
 ### 3a. Reinstall **this** device (keep data if you can)
 
@@ -284,11 +307,24 @@ bootm 0x01000000 0x02000000
 This is the default supported path and works on both a stock and an already
 converted unit without changing SPI.
 
-## 8. Optional unattended boot — high-risk `saveenv`
+## 8. Optional unattended boot — with Automatic DSM / Blank-Disk Rollback
 
 Skip this section unless unattended cold boot is essential. Synology placed
 the U-Boot environment at SPI offset `0x00100000`, inside the stock kernel
 area. A bad write can brick the NAS. Keep UART attached throughout.
+
+### Why use the Fallback Bootchain?
+If you set a hardcoded `bootcmd` that directly loads `ide 0:2` without a fallback, swapping in a blank HDD or a DSM disk will halt at the `Marvell>>` prompt, appearing "dead" until UART intervention.
+
+By configuring a **conditional fallback bootchain**, the DS115j achieves **Zero-Touch Rollback**:
+1. **Debian Disk inserted:** `ext2load ide 0:2` finds the Debian kernel and ramdisk on partition 2 $\rightarrow$ boots Debian automatically.
+2. **Blank HDD / Stock DSM Disk / No Disk inserted:** Partition 2 ext2 is missing or corrupt $\rightarrow$ `debianboot` fails $\rightarrow$ U-Boot automatically falls back to `synoboot` (`sf probe 0 50000000; bootm 0xf40c0000 0xf4390000`).
+   - The stock kernel in the SPI flash boots into Synology Recovery/Web Assistant mode.
+   - **Synology Assistant** or `find.synology.com` immediately detects the NAS on your network as "Not installed".
+   - You can install stock DSM through the web browser without ever touching UART.
+   - To return to Debian later, simply swap back the Debian HDD!
+
+### Procedure
 
 Before the one permitted `saveenv`, make a **board-specific** 8 MiB dump:
 
@@ -304,18 +340,20 @@ Before the one permitted `saveenv`, make a **board-specific** 8 MiB dump:
    and another copy outside the NAS; `wc -c UNIQUE-NAME.bin` must report
    exactly `8388608`.
 4. Reboot with UART, type the §7 commands, and confirm they boot successfully.
-5. At the next `Marvell>>` prompt, inspect `printenv bootargs bootcmd`. Only
-   then set the exact values proven by the live DS115j:
+5. At the next `Marvell>>` prompt, inspect `printenv bootargs bootcmd`. Then configure the fallback bootchain:
 
 ```text
 setenv bootargs 'console=ttyS0,115200 earlyprintk root=LABEL=rootfs rootwait rw panic=10'
-setenv bootcmd 'ide reset; ext2load ide 0:2 0x01000000 /boot/uImage-ds115j; ext2load ide 0:2 0x02000000 /boot/uRamdisk-hdd-ds115j; bootm 0x01000000 0x02000000'
-printenv bootargs bootcmd
+setenv debianboot 'ide reset && ext2load ide 0:2 0x01000000 /boot/uImage-ds115j && ext2load ide 0:2 0x02000000 /boot/uRamdisk-hdd-ds115j && bootm 0x01000000 0x02000000'
+setenv synoboot 'sf probe 0 50000000; bootm 0xf40c0000 0xf4390000'
+setenv bootcmd 'run debianboot || run synoboot'
+printenv bootargs debianboot synoboot bootcmd
 saveenv
 ```
 
-Power-cycle once with UART attached. If anything differs from those exact
-values, do **not** run `saveenv`; continue using §7.
+Power-cycle once with UART attached to verify:
+- With the Debian disk: Debian boots cleanly without user interaction.
+- (Optional test): Remove the drive or test with a blank drive; verify it boots the stock SPI kernel and appears in Synology Assistant.
 
 ## 9. Checks
 
