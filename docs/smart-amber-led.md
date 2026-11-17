@@ -1,6 +1,7 @@
 # SMART-only amber disk LED
 
-Implemented 2026-09-16 on `root@192.168.68.233`.
+This page describes the SMART-only amber fault indicator. The behavior was
+verified on the device on 2026-09-16; it is not a live status report.
 
 ## Behaviour
 

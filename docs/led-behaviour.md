@@ -19,10 +19,10 @@ Linux cannot talk to the MCU until `/dev/ttyS1` exists, so U-Boot + early kernel
 - SMART health/attribute failure: amber **steady ON**. See [smart-amber-led.md](smart-amber-led.md).
 - **Never** `disk-activity` on amber — the bay then blinks orange and hides the green LED. Optional udev rule is **not** installed (`scripts/disk-led-amber-activity.rules.optional-NOT-INSTALLED`).
 
-## Owner test (MCU)
+## Verify the MCU connection
 
 ```bash
-ssh root@192.168.68.233
+ssh root@<NAS_IP>
 /usr/local/sbin/syno-mcu.sh ping
 /usr/local/sbin/syno-mcu.sh healthy
 ```

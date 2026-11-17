@@ -1,15 +1,13 @@
-# USB VBUS FIX + POWER-BUTTON FINDING — DS115j (2026-09-20)
+# USB VBUS fix — DS115j (2026-09-20)
 
-Result of the "no 5 V on either USB port" investigation and the power-button
-question ("може це якось пов'язано з пінами").
+Record of the USB power investigation and device-tree fix.
 
 ## Verdict
 
 1. **USB is FIXED, root cause was in the DTB.** Both ports now deliver 5 V and
    enumerate devices with the standard kernel.
-2. **Power button is NOT related to the pins.** It was never wired to power off
-   under this Debian; it is a pre-existing gap (missing ttyS1 daemon). Nothing
-   in this session's GPIO work touched the button's power path.
+2. The power button is unrelated to the USB VBUS GPIO. Its operation is
+   documented separately in [power-button.md](power-button.md).
 
 ---
 
@@ -107,7 +105,10 @@ on sda2.
 
 ---
 
-## Power button finding (unrelated to pins)
+## Historical power-button note (as of 2026-09-20)
+
+This predates the later button-handler implementation; see
+[power-button.md](power-button.md) for the current design and verification.
 
 - The power button only powers the box **ON** (after a PSU cut) — it never
   powered it OFF under this Debian.

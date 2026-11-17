@@ -1,27 +1,34 @@
 # Install / reinstall with UART (manual)
 
-Simple hand path. UART connected. No Cursor agents required.
-
 Two cases:
 
-1. **New DS115j** (stock DSM, blank disk, or unknown) → Debian like the current daily-ready box.
-2. **Reinstall this device** (the NAS already on `.233`) without casually destroying `sda3` data.
+1. **New DS115j** (stock DSM, blank disk, or unknown) → Debian.
+2. **Reinstall an existing device** without casually destroying its data partition.
 
 This page is the complete happy path. You do not need a helper machine, an
 agent, or another document: only this repository on the laptop, Internet
 access from the NAS for `apt`, and the UART/TFTP connection below.
 
-## 0. Desk setup and Hardware Pinout
+## 0. Desk setup and hardware pinout
+
+Replace placeholders such as `<NAS_IP>` and `<LAPTOP_IP>` in the commands
+below with addresses valid on your LAN. Review the network configuration under
+`config/` and adapt the target MAC address before installing. The repository
+scripts and configuration retain deployment defaults; this documentation does
+not change them.
 
 ```text
 UART:   115200 8N1
         Console is UART0 / ttyS0. UART1 / ttyS1 is the PIC MCU — leave it alone.
         Linux: sudo screen /dev/ttyACM0 115200  (or /dev/ttyUSB0)
         macOS: screen /dev/cu.usbmodem* 115200 (or /dev/cu.usbserial*)
-NAS IP: 192.168.68.233/22 (or DHCP on your local subnet)
-Laptop: e.g. 192.168.68.251 (or your laptop's local IP) — serves files from this repo
-Default password: ds115j
+NAS:    <NAS_IP> (or the address assigned by DHCP)
+Laptop: <LAPTOP_IP> — serves files from this repository
 ```
+
+The root filesystem uses a shared bootstrap credential. Treat it as public:
+log in through UART and set a unique root password before enabling SSH access
+on the LAN. Do not expose password-based root SSH to the Internet.
 
 ### Motherboard UART Pinout (6-pin header next to fan connector)
 Remove the chassis cover. Next to the internal chassis fan connector on the PCB, there is a 6-pin header labeled on the silkscreen (often `JP1`, `JP2`, or `J2`):
@@ -83,12 +90,11 @@ You are only going to **type** boot commands. Do not `saveenv`.
 
 ## 2. Serve and TFTP the kernel from the laptop
 
-On the Mac, clone this repository and give its LAN interface an address on the
-same `/22`, for example `192.168.68.251/22`. The included network files use
-the live unit's MAC `00:11:32:4d:c3:b8`; for a different chassis, first replace
-that value in `config/interfaces`, `config/interfaces-bootstrap`, and
-`config/10-ds115j-eth0.link` with the new unit's sticker MAC. From the
-repository root:
+On the laptop, clone this repository and give its LAN interface an address
+reachable from the NAS. Before installation, check whether
+`config/interfaces`, `config/interfaces-bootstrap`, and
+`config/10-ds115j-eth0.link` contain a MAC address or static network settings;
+if so, update them for the target device and LAN. From the repository root:
 
 ```bash
 scripts/serve-tftp.sh
@@ -98,9 +104,9 @@ This stages and serves the three known-good files from `boot/` using macOS
 `/usr/libexec/tftpd`. It prompts for `sudo` because TFTP uses UDP/69. In U-Boot:
 
 ```text
-Marvell>> setenv ipaddr 192.168.68.233
-Marvell>> setenv serverip 192.168.68.251
-Marvell>> setenv netmask 255.255.252.0
+Marvell>> setenv ipaddr <NAS_IP>
+Marvell>> setenv serverip <LAPTOP_IP>
+Marvell>> setenv netmask <NETMASK>
 Marvell>> setenv bootargs 'console=ttyS0,115200 earlyprintk root=/dev/ram0 rdinit=/init'
 Marvell>> tftpboot 0x01000000 uImage-ds115j
 Marvell>> tftpboot 0x02000000 uRamdisk-recovery-ds115j
@@ -125,7 +131,7 @@ cat /proc/partitions
 If you have started the HTTP server on your laptop (`scripts/reconstruct-rootfs.sh && python3 -m http.server 45152 --bind 0.0.0.0`), you can perform steps 3, 4, and 5 in **one single command** inside BusyBox recovery:
 
 ```sh
-wget -qO- http://192.168.68.251:45152/scripts/provision-hdd.sh | sh
+wget -qO- http://<LAPTOP_IP>:45152/scripts/provision-hdd.sh | sh
 ```
 
 This automated script will:
@@ -208,6 +214,12 @@ scripts/reconstruct-rootfs.sh
 python3 -m http.server 45152 --bind 0.0.0.0 --directory "$PWD"
 ```
 
+This serves the repository over plain HTTP to every reachable network interface,
+including the tracked rootfs payload, which contains shared bootstrap
+credentials and SSH host private keys. Use only on a trusted, isolated LAN and
+stop the server when installation is complete; do not expose it to the Internet
+or an untrusted network. See the security warning in the [README](../README.md).
+
 The reconstruction script verifies SHA-256
 `9d869bf8f45f6f3908097aece847bb2d1bde4a6213801cb8460cdb83f9a30eb6`
 and also creates `ds115j-install-kit.tar.gz`. Run HTTP in a second laptop
@@ -218,26 +230,25 @@ Then, from recovery:
 ```sh
 mkdir -p /mnt
 mount /dev/sda1 /mnt
-wget -O /tmp/rootfs.tgz http://192.168.68.251:45152/rootfs-trixie-armhf.tar.gz
+wget -O /tmp/rootfs.tgz http://<LAPTOP_IP>:45152/rootfs-trixie-armhf.tar.gz
 tar -C /mnt -xzf /tmp/rootfs.tgz
 mkdir -p /mnt/etc/network /mnt/etc/systemd/network /mnt/etc/apt /mnt/srv/data
 wget -O /mnt/etc/network/interfaces \
-  http://192.168.68.251:45152/config/interfaces-bootstrap
+  http://<LAPTOP_IP>:45152/config/interfaces-bootstrap
 wget -O /mnt/etc/systemd/network/10-ds115j-eth0.link \
-  http://192.168.68.251:45152/config/10-ds115j-eth0.link
+  http://<LAPTOP_IP>:45152/config/10-ds115j-eth0.link
 wget -O /mnt/etc/fstab \
-  http://192.168.68.251:45152/config/fstab
+  http://<LAPTOP_IP>:45152/config/fstab
 wget -O /mnt/etc/apt/sources.list \
-  http://192.168.68.251:45152/config/sources.list
+  http://<LAPTOP_IP>:45152/config/sources.list
 sync
 umount /mnt
 ```
 
-Those four files provide static `.233` for the first boot (the rootfs does not
-yet have a DHCP client), stable MAC naming, `LABEL=data` at `/srv/data`, and
-Debian trixie, updates, and security repositories. The installer in §6 adds
-DHCP while retaining `.233` as `eth0:1`; there is deliberately no
-`auto eth0:1 inet static` stanza.
+Those files provide the first-boot network configuration (the rootfs may not
+yet have a DHCP client), interface naming, `LABEL=data` at `/srv/data`, and
+Debian trixie, updates, and security repositories. Check that the selected
+configuration matches your LAN before booting.
 
 The shipped rootfs already includes the
 `6.12.107+deb13-armmp` module tree matching `boot/uImage-ds115j`. Do not replace
@@ -252,9 +263,9 @@ mkdir -p /mnt
 mount /dev/sda2 /mnt
 mkdir -p /mnt/boot
 wget -O /mnt/boot/uImage-ds115j \
-  http://192.168.68.251:45152/boot/uImage-ds115j
+  http://<LAPTOP_IP>:45152/boot/uImage-ds115j
 wget -O /mnt/boot/uRamdisk-hdd-ds115j \
-  http://192.168.68.251:45152/boot/uRamdisk-hdd-ds115j
+  http://<LAPTOP_IP>:45152/boot/uRamdisk-hdd-ds115j
 echo '6b58d6eee97005845923167d5fe481035b7031195935bd632cdbe29ae75ed0f6  /mnt/boot/uImage-ds115j' | sha256sum -c -
 echo 'dbbd30ec2c3772e2816eaa5e3295b0580a357fc93458dcb3bf063bf7bf65cd75  /mnt/boot/uRamdisk-hdd-ds115j' | sha256sum -c -
 sync
@@ -276,7 +287,9 @@ setenv bootargs 'console=ttyS0,115200 earlyprintk root=LABEL=rootfs rootwait rw 
 bootm 0x01000000 0x02000000
 ```
 
-Log in on UART as `root` / `ds115j`. Wait for the one-time Debian second stage
+Log in over UART with the bootstrap credentials configured for this rootfs.
+Set a unique root password before allowing SSH access from the LAN. Wait for
+the one-time Debian second stage
 to finish, confirm Internet works, fetch the version-matched kit from the
 laptop HTTP server, and run the installer:
 
@@ -291,7 +304,7 @@ done
 ping -c 3 deb.debian.org
 cd /root
 wget -O ds115j-install-kit.tar.gz \
-  http://192.168.68.251:45152/ds115j-install-kit.tar.gz
+  http://<LAPTOP_IP>:45152/ds115j-install-kit.tar.gz
 mkdir -p ds115j-kit
 tar -C ds115j-kit -xzf ds115j-install-kit.tar.gz
 cd ds115j-kit
@@ -300,8 +313,8 @@ sh scripts/install-userspace.sh
 
 `install-userspace.sh` explicitly installs `chrony`, `zram-tools`,
 `smartmontools`, `hdparm`, `dbus`, `ifupdown`, the DHCP client, `kmod`, and CA
-certificates. It installs trixie/updates/security apt sources, the DHCP +
-`.233` network config and `.link`, creates `/srv/data`, installs the
+certificates. It installs trixie/updates/security apt sources, the configured network files,
+creates `/srv/data`, installs the
 `LABEL=data` fstab entry, then installs and enables:
 
 | Piece | Files |
@@ -365,7 +378,7 @@ Before the one permitted `saveenv`, make a **board-specific** 8 MiB dump:
 1. On the laptop, from this repository, run `scripts/recv-spi.sh` and leave it
    listening on TCP 45151.
 2. On the NAS run
-   `RECEIVER=192.168.68.251 sh /root/ds115j-kit/scripts/dump-spi-linux.sh`.
+   `RECEIVER=<LAPTOP_IP> sh /root/ds115j-kit/scripts/dump-spi-linux.sh`.
 3. The receiver verifies the size and writes the dump under `backups/spi/`.
    Copy that `.bin` into `firmware/spi/` with a unique chassis/date name, then
    from `firmware/spi/` run
@@ -393,7 +406,7 @@ Power-cycle once with UART attached to verify:
 
 ```sh
 uname -r                    # 6.12.107+deb13-armmp
-ip -4 addr show dev eth0    # DHCP plus .233 labelled eth0:1
+ip -4 addr show dev eth0    # verify the configured address(es)
 findmnt /                    # rw,noatime,commit=60 on LABEL=rootfs
 findmnt /srv/data            # source carrying LABEL=data, rw,noatime
 apt-get update               # trixie + updates + security succeed
@@ -432,7 +445,7 @@ present to press the button afterward to power the NAS back on.
 ## 10. Daily-ready result
 
 When every §9 check passes, the NAS is daily-ready: local HDD boot, DHCP plus
-permanent `.233`, `/srv/data`, working trixie apt, SMART monitoring and amber
+configured secondary address, the configured data mount, working trixie apt, SMART monitoring and amber
 fault indication, 10-minute HDD spin-down (`docs/disk-idle.md`), chrony, zram,
 MCU boot/ready LEDs and beep, temperature fan control, the soft-poweroff
 module, and a **front power button that cleanly powers the NAS off**

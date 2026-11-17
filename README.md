@@ -38,6 +38,13 @@ scripts/reconstruct-rootfs.sh
 The generated archives are ignored by Git. They are required by the documented
 install flow and can be recreated from the tracked files.
 
+The tracked root filesystem payload includes a shared bootstrap credential and
+SSH host private keys. Treat both as compromised: change the root password over
+UART and regenerate the host keys on the device before enabling network SSH.
+This documentation-only cleanup does not remove sensitive material from the
+payload or deployment defaults from scripts and configuration files. Review
+those files before distributing the repository.
+
 ## Documentation
 
 | Topic | Guide |
@@ -79,6 +86,8 @@ relying on a recorded result.
 - `scripts/extract-hdd.sh` is a destructive legacy utility retained for
   historical recovery workflows; do not run it on the live NAS.
 - Do not attach disk-activity triggers to the bay's amber fault LED.
+- Never publish credentials, host keys, MAC addresses, disk UUIDs, or private
+  network details from a live device.
 
 See the full [landmines list](docs/landmines.md) before using U-Boot or changing
 the boot chain.

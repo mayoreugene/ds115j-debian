@@ -76,7 +76,7 @@ This was verified live: the plain rule failed for `sdb4`/`sdc1` on every boot,
 Give an fstab USB line a generous `x-systemd.device-timeout` (e.g. `30s`);
 USB devices report "ready" late, so the default `1s` makes the unit miss the
 device at boot. The automounter then delegates to the fstab unit, so the disk
-ends up mounted at its canonical fstab path (`/srv/usb-tm` in the example
+ends up mounted at its canonical fstab path (for example, `/srv/<MOUNT_POINT>`)
 above) with no `/mnt/usb-*` duplicate.
 
 ### Verify

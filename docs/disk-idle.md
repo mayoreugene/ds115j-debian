@@ -96,4 +96,4 @@ you are prepared for a spin-up on the next I/O.
 - Never `ide 0:1`, `ifdown eth0`, unbind `gpio-fan`, SPI/`saveenv`, or wipe
   partitions.
 - Do not set the fan to PWM 0.
-- Prefer `.233` (`eth0:1`) so DHCP changes do not drop SSH.
+- Prefer the configured stable management address so DHCP changes do not drop SSH.

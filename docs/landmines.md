@@ -63,18 +63,16 @@ The fan is a **gpio-fan** on `/sys/class/hwmon/hwmon1`. Controller: **`/usr/loca
 - Manual control: `echo <pwm> > /sys/class/hwmon/hwmon1/pwm1` (pwm ≥ 25). Use `syno-mcu.sh alarm` for overheat signalling, not raw bytes.
 - Overheat: `syno-fan.sh` auto-triggers `syno-mcu.sh alarm` at ≥75°C, once per episode; clears ≤70°C.
 
-## 6. Keep the root password (owner preference)
+## 6. Protect access
 
-Root password SSH on this **trusted LAN** is an accepted preference.
-
-- Do not silently switch to key-only or delete root login.
-- Do not expose SSH to the Internet.
-- Keep SSH restricted to the trusted LAN; do not expose it to the Internet.
+The bundled root filesystem has a shared bootstrap login. Treat it as public:
+change the password over UART before enabling SSH access. Do not expose
+password-based root SSH to the Internet.
 
 ## 7. 256 MiB RAM is a hard ceiling
 
-- Available RAM ~233 MiB; **no swap** as of the 2026-09-15 probe.
-- Use **modest zram**, not a large HDD swap file as default.
+- Available physical RAM is about 233 MiB; the documented setup uses zram.
+- Avoid a large HDD swap file as the default.
 - Do not install Docker/K8s, Plex transcoding, Nextcloud “full stack”, etc.
 - `systemd-udevd` spinning already burns a large fraction of the single 800 MHz core — fix that before adding Samba load.
 
@@ -82,7 +80,7 @@ Root password SSH on this **trusted LAN** is an accepted preference.
 
 - **SGMII DTS is wrong.** Do not restore `phy-mode = "sgmii"` or boot `*.bak-sgmii*` images.
 - **No external I2C RTC.** Bus scan empty; `0x30`/`0x32`/`0x68` NACK. Do not add `isl12057@0x68`. `rtc-mv` is the real clock.
-- **Do not `ifdown eth0`** or blindly `systemctl restart networking` from the only SSH session. Preserve `.233`; keep UART as rollback.
+- **Do not `ifdown eth0`** or blindly `systemctl restart networking` from the only SSH session. Preserve the configured management address; keep UART as rollback.
 - **Do not overwrite TFTP/current `uImage` from stale copies.**  
   Current TFTP **and** sda2: SHA-256 `6b58d6eee97005845923167d5fe481035b7031195935bd632cdbe29ae75ed0f6` (6,060,530 bytes) — the **v2 with USB VBUS fix** (`usb-regulator@2` on MPP44, always-on), verified live 2026-09-20.  
   Previous no-USB-fix image (no-`alarm-gpios`) `5ea71e0b…` (6,060,176 bytes) — **do not promote**.  
@@ -90,5 +88,6 @@ Root password SSH on this **trusted LAN** is an accepted preference.
   Older `kernel/uImage-ds115j` / `69e60698…` (6,060,240 bytes) — **do not promote**.
 - **Kernel + appended DTB + HDD initramfs + `qnap-poweroff-ds115j.ko` are one set.** Exact vermagic `6.12.107+deb13-armmp`. Do not APT-upgrade the kernel as a normal package update.
 - **Fan:** never leave target at 0; restore **1000**. `fan1_input` is **not** measured RPM.
-- **UART:** do not leave `screen` holding `/dev/cu.usbserial-BG01OOBA`.
+- **UART:** close the `screen` session when finished so it does not hold the
+  adapter's serial device.
 - **Do not boot `uImage-nodtb`.**

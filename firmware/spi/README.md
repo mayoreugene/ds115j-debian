@@ -20,8 +20,8 @@ Key findings used by [docs/power-button.md](../../docs/power-button.md):
   `current_tty_buf` (hex `%.2x` format) — the MCU channel is **UART1 (ttyS1)**,
   synchronous/polled by DSM userspace via `synobios_ioctl`.
 - Conclusion: the front power button is wired to the PIC16LF1828; DSM peers with
-  the PIC over /dev/ttyS1 at 9600 8N1. Under Debian the passive daemon
-  `syno-powerbtn` (observe-first) listens on ttyS1 read-only.
+  the PIC over /dev/ttyS1 at 9600 8N1. Under Debian the `syno-powerbtn` service
+  listens read-only for the configured trigger byte.
 
 Artifacts:
 - `synobios-strings.txt` — full `strings` dump of synobios.ko

@@ -6,7 +6,6 @@ Also kept: ds115j-vendor-20260915-124844.bin (65536 bytes, SHA-256 9cc6345f…)
 
 Ways in:
   TCP 45151  — python3 scripts/spi-recv-daemon.py (running)
-  scp        — scp dump root@192.168.68.250:/root/ds115j/backups/spi/
+  scp        — copy the dump to the NAS or another trusted host using its configured address
   TFTP WRQ   — tftpput … ds115j-spi-8m.bin  →  /srv/tftp/ then:
                /root/ds115j/scripts/harvest-tftp-spi.sh
-

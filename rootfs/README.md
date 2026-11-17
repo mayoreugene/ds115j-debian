@@ -16,3 +16,8 @@ Verify the parts independently from the repository root with:
 ```bash
 (cd rootfs && shasum -a 256 -c SHA256SUMS)
 ```
+
+The reconstructed archive contains a shared bootstrap credential and SSH host
+private keys. See the security warning in the [repository README](../README.md)
+before distributing the payload; replace the credential and regenerate host
+keys for each deployment.

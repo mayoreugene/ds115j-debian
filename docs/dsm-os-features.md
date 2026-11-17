@@ -25,7 +25,7 @@ Legend: ✅ replicated on our Debian · ⚠️ replicated but different · 🆕 
 | **HW crypto (CESA)** | `marvell-cesa` | ✅ | Driver bound; kernel crypto API (IPsec, dm-crypt) uses it automatically |
 | **Thermal zone** | `f1018300.thermal` (Armada 370 SoC temp) | ✅ | `thermal_zone0` read-only — no trip points configured, fan is the cooler |
 | **CPU idle** | — | ⚠️ | **No `cpuidle` in sysfs** — this kernel build has no CPU_IDLE states for Armada 370 (slight idle-power cost, functionally irrelevant). DSM does not add it either |
-| **Disk APM** | `DiskApmSet.sh` | ✅ | This WD disk: `APM not supported` — nothing to set. `hdparm -S 120` standby gives the hibernation `support_disk_hibernation=yes` |
+| **Disk APM** | `DiskApmSet.sh` | ✅ | Installed disk: `APM not supported` — nothing to set. `hdparm -S 120` standby gives the hibernation `support_disk_hibernation=yes` |
 | **SMART** | `smartd.conf`, `supportsmart=yes` | ✅ | `smart-amber-led` |
 
 ## OS-level
@@ -36,7 +36,7 @@ Legend: ✅ replicated on our Debian · ⚠️ replicated but different · 🆕 
 | `net.core.somaxconn` | 65535 | 4096 | 🆕 **apply 65535** — file-server friendly (many SMB/NFS clients) |
 | `net.ipv4.tcp_tw_reuse` | 1 | 2 (6.x default: enabled+safe) | keep 2 |
 | `net.ipv6.conf.default.accept_ra_defrtr` | 0 | unset (we use static/DHCP) | 🆕 set 0 via sysctl.d for parity |
-| IPv6 in general | `disable_ipv6` toggles in rc.network | IPv4-only LAN | **leave IPv6 addressed by SLAAC/router**; nothing to change |
+| IPv6 in general | `disable_ipv6` toggles in rc.network | IPv4 configured for this network | **leave IPv6 addressed by SLAAC/router**; nothing to change |
 | `ip_forward` | 1 (router mode) | 0 | keep 0 — single NIC, not a router |
 | `somaxconn` echo | rc pieces | — | see above |
 
