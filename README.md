@@ -17,9 +17,11 @@ Live probe: [docs/current-state.md](docs/current-state.md). Cold-boot checklist:
 
 | Role | Address | Login |
 |------|---------|--------|
-| NAS | `192.168.68.233/22` | `ssh root@192.168.68.233` password `ds115j` |
-| Laptop (TFTP) | example `192.168.68.251/22` | run `scripts/serve-tftp.sh` from this clone |
-| UART | `115200 8N1` | `screen /dev/cu.usbserial-BG01OOBA 115200` |
+| NAS | `192.168.68.233` (or DHCP) | `ssh root@<NAS-IP>` password `ds115j` |
+| Laptop (TFTP/HTTP) | example `192.168.68.251` (or local IP) | run `scripts/serve-tftp.sh` and python HTTP |
+| UART | `115200 8N1` (3.3V TTL) | Linux: `sudo screen /dev/ttyACM0 115200` / Mac: `screen /dev/cu.usbmodem* 115200` |
+
+*(Tip: You can use a Raspberry Pi Pico as a 3.3V USB-UART adapter with [pico-uart-bridge](https://github.com/Noltari/pico-uart-bridge)).*
 
 Full notes: [docs/access.md](docs/access.md).
 
@@ -28,7 +30,7 @@ Full notes: [docs/access.md](docs/access.md).
 Verify after copy:
 
 ```bash
-cd boot && shasum -a 256 -c SHA256SUMS
+cd boot && (sha256sum -c SHA256SUMS 2>/dev/null || shasum -a 256 -c SHA256SUMS)
 ```
 
 | File | SHA-256 (full) | Role |

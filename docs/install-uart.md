@@ -11,15 +11,45 @@ This page is the complete happy path. You do not need a helper machine, an
 agent, or another document: only this repository on the laptop, Internet
 access from the NAS for `apt`, and the UART/TFTP connection below.
 
-## 0. Desk setup
+## 0. Desk setup and Hardware Pinout
 
 ```text
-UART:   115200 8N1   (Mac: screen /dev/cu.usbserial-BG01OOBA 115200)
+UART:   115200 8N1
         Console is UART0 / ttyS0. UART1 / ttyS1 is the PIC MCU — leave it alone.
-NAS IP: 192.168.68.233/22     netmask 255.255.252.0     gateway 192.168.68.1
-Laptop: example 192.168.68.251/22   serves files from this repository
-Password (LAN): ds115j
+        Linux: sudo screen /dev/ttyACM0 115200  (or /dev/ttyUSB0)
+        macOS: screen /dev/cu.usbmodem* 115200 (or /dev/cu.usbserial*)
+NAS IP: 192.168.68.233/22 (or DHCP on your local subnet)
+Laptop: e.g. 192.168.68.251 (or your laptop's local IP) — serves files from this repo
+Default password: ds115j
 ```
+
+### Motherboard UART Pinout (6-pin header next to fan connector)
+Remove the chassis cover. Next to the internal chassis fan connector on the PCB, there is a 6-pin header labeled on the silkscreen (often `JP1`, `JP2`, or `J2`):
+
+```text
+         (DS115j PCB Header)
+        ┌───────────┐
+  Pin 1 │  o     ●  │ Pin 2  ───►  GND  (Labeled on PCB)
+  Pin 3 │  o     ●  │ Pin 4  ───►  TX   (NAS Transmit, 3.3V TTL - middle pin)
+  Pin 5 │  o     ●  │ Pin 6  ───►  RX   (NAS Receive, 3.3V TTL - labeled on PCB)
+        └───────────┘
+```
+
+- **Pin 2 (GND):** Ground (labeled on board; continuous with chassis metal).
+- **Pin 4 (TX):** Transmit from NAS (3.3V logic level). Connects to adapter **RX**.
+- **Pin 6 (RX):** Receive into NAS (3.3V logic level). Connects to adapter **TX**.
+- **Pins 1, 3, 5:** **LEAVE UNCONNECTED** (VCC/power; the NAS and adapter are powered separately).
+
+### Using a Raspberry Pi Pico as a 3.3V USB-UART adapter
+You can use a cheap Raspberry Pi Pico as your serial adapter with the open-source [pico-uart-bridge](https://github.com/Noltari/pico-uart-bridge) firmware:
+1. Hold the Pico's `BOOTSEL` button while plugging it into your computer via USB.
+2. Drag-and-drop the `pico-uart-bridge.uf2` binary onto the `RPI-RP2` drive.
+3. Wire the Pico directly to the DS115j header (both operate at 3.3V logic levels):
+   - **Pico GND (Pin 23, 3, or 38)** $\longleftrightarrow$ **DS115j Pin 2 (GND)**
+   - **Pico GPIO17 / Pin 22 (UART0 RX)** $\longleftrightarrow$ **DS115j Pin 4 (TX)**
+   - **Pico GPIO16 / Pin 21 (UART0 TX)** $\longleftrightarrow$ **DS115j Pin 6 (RX)**
+   - **DO NOT connect 3.3V/VCC!**
+4. Connect to the resulting serial device (`/dev/ttyACM0` on Linux, `/dev/cu.usbmodem*` on Mac) at `115200 8N1`.
 
 Kill stale `screen` sessions before you start (`screen -ls`).
 
@@ -71,6 +101,7 @@ This stages and serves the three known-good files from `boot/` using macOS
 Marvell>> setenv ipaddr 192.168.68.233
 Marvell>> setenv serverip 192.168.68.251
 Marvell>> setenv netmask 255.255.252.0
+Marvell>> setenv bootargs 'console=ttyS0,115200 earlyprintk root=/dev/ram0 rdinit=/init'
 Marvell>> tftpboot 0x01000000 uImage-ds115j
 Marvell>> tftpboot 0x02000000 uRamdisk-recovery-ds115j
 Marvell>> bootm 0x01000000 0x02000000

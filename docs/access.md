@@ -15,14 +15,26 @@ Trusted LAN only. Do not publish these details off-LAN.
 
 Owner preference: root/password SSH is acceptable on this LAN. Keep it LAN-only. Do not expose SSH to the Internet.
 
-## UART from the Mac
+## UART console access
 
 ```bash
-screen /dev/cu.usbserial-BG01OOBA 115200
+# Linux (e.g. Fedora, Ubuntu):
+sudo screen /dev/ttyACM0 115200   # Pico USB CDC
+sudo screen /dev/ttyUSB0 115200   # FTDI / CH340 / CP2102
+
+# macOS:
+screen /dev/cu.usbmodem* 115200   # Pico USB CDC
+screen /dev/cu.usbserial* 115200  # FTDI / CH340 / CP2102
 ```
 
-- Console: UART0 / `ttyS0`, 115200 8N1.
+- Console is UART0 / `ttyS0`, 115200 8N1.
 - Interrupt U-Boot during the 3-second countdown → `Marvell>>`.
+- **Motherboard 6-pin Header (next to fan):**
+  - **Pin 2:** GND (labeled on PCB)
+  - **Pin 4:** TX (NAS transmit, 3.3V TTL - middle pin)
+  - **Pin 6:** RX (NAS receive, 3.3V TTL - labeled on PCB)
+  - Pins 1, 3, 5: Not connected (3.3V VCC)
+- **Raspberry Pi Pico as UART bridge:** You can flash [Noltari/pico-uart-bridge](https://github.com/Noltari/pico-uart-bridge) onto a Raspberry Pi Pico. Connect Pico GND $\leftrightarrow$ Pin 2, Pico GPIO17 / Pin 22 (UART0 RX) $\leftrightarrow$ Pin 4 (TX), Pico GPIO16 / Pin 21 (UART0 TX) $\leftrightarrow$ Pin 6 (RX). Do not connect 3.3V/VCC.
 - **Never leave a foreign/root `screen` holding this device.** Check and kill stale sessions before another operator needs UART.
 - UART1 / `ttyS1` is the Synology PIC MCU (power-off, status LED, beeper). Do not hijack it for a second console.
 
