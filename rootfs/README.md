@@ -1,23 +1,16 @@
-# Rootfs archive
+# Root filesystem
 
-These ordinary Git files are consecutive parts of
-`rootfs-trixie-armhf.tar.gz`. They are split because GitHub rejects individual
-files over 100 MB; Git LFS is not required.
-
-Run `../scripts/reconstruct-rootfs.sh` from any directory. It concatenates the
-parts in order and verifies the original archive SHA-256:
-
-```text
-9d869bf8f45f6f3908097aece847bb2d1bde4a6213801cb8460cdb83f9a30eb6
-```
-
-Verify the parts independently from the repository root with:
+The generated Debian root filesystem is intentionally not stored in Git.
+Build it on a Linux host with:
 
 ```bash
-(cd rootfs && shasum -a 256 -c SHA256SUMS)
+sudo scripts/reconstruct-rootfs.sh
 ```
 
-The reconstructed archive contains a shared bootstrap credential and SSH host
-private keys. See the security warning in the [repository README](../README.md)
-before distributing the payload; replace the credential and regenerate host
-keys for each deployment.
+This creates `rootfs-trixie-armhf.tar.gz` and
+`ds115j-install-kit.tar.gz` in the repository root. Both are ignored by Git.
+The build needs Linux, `mmdebstrap`, `dpkg-deb`, `depmod`, `sha1sum`, OpenSSL,
+`ssh-keygen`, Python 3, GNU tar, and `curl` or `wget`. It downloads packages
+from Debian and prompts for a unique initial root password.
+
+See [build notes](../docs/build-artifacts.md) for details.

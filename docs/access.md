@@ -91,7 +91,7 @@ do not use an image without its appended DTB.
 |---|---|---|
 | UDP 69 | TFTP | `scripts/serve-tftp.sh` |
 | TCP 45151 | SPI dump receiver, when needed | `python3 scripts/spi-recv-daemon.py` |
-| TCP 45152 | HTTP files for installation | `scripts/reconstruct-rootfs.sh`, then `python3 -m http.server 45152 --bind 0.0.0.0 --directory "$PWD"` |
+| TCP 45152 | HTTP files for installation | Build with `sudo scripts/reconstruct-rootfs.sh`, then run `python3 -m http.server 45152 --bind <LAPTOP_IP> --directory "$PWD"` |
 
 Bind temporary file servers only to a trusted LAN and stop them after use.
 No DHCP, PXE, or NFS server is required by the documented workflow.
@@ -112,7 +112,6 @@ this table.
 
 ## Credentials
 
-The bundled root filesystem is intended for a controlled first-boot process.
-Treat any shared bootstrap credential as public: set a unique root password
-from the UART console before allowing SSH access from the LAN. Do not expose
+The rootfs build asks you to set its initial root password and creates fresh
+SSH host keys. Use the password selected for that build. Do not expose
 password-based root SSH to the Internet.

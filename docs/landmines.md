@@ -65,9 +65,8 @@ The fan is a **gpio-fan** on `/sys/class/hwmon/hwmon1`. Controller: **`/usr/loca
 
 ## 6. Protect access
 
-The bundled root filesystem has a shared bootstrap login. Treat it as public:
-change the password over UART before enabling SSH access. Do not expose
-password-based root SSH to the Internet.
+The rootfs builder sets a password chosen for that build and creates fresh
+SSH host keys. Do not expose password-based root SSH to the Internet.
 
 ## 7. 256 MiB RAM is a hard ceiling
 

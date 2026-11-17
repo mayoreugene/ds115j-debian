@@ -7,11 +7,13 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 TARGET=${TARGET:-$ROOT/rootfs-build}
 export TARGET
 KVER=6.12.107+deb13-armmp
-MODSRC=${MODSRC:-$ROOT/kernel/usr/lib/modules/$KVER}
-ROOT_HASH='$6$ds115j$8thWTncFzUFWIKn749shWZByOQahw6JQz8VV/A0F1f5V.1y/CInssbonl7xQ0nFWyeJdSieGu6cLOOuSO0.UV0'
 
 if [ ! -d "$TARGET/etc" ]; then
     echo "No rootfs at $TARGET — run bootstrap-rootfs.sh first." >&2
+    exit 1
+fi
+if [ ! -f "$TARGET/usr/lib/modules/$KVER/modules.dep" ]; then
+    echo "Matching kernel modules are missing from $TARGET; run bootstrap-rootfs.sh first." >&2
     exit 1
 fi
 
@@ -66,8 +68,8 @@ HostKey /etc/ssh/ssh_host_rsa_key
 HostKey /etc/ssh/ssh_host_ecdsa_key
 HostKey /etc/ssh/ssh_host_ed25519_key
 
-# Temporary: password root login from the LAN. Change the password and
-# switch to keys before exposing this host beyond 192.168.68.0/22.
+# Temporary bring-up access. Change the password and switch to keys before
+# exposing this host beyond a trusted local network.
 PermitRootLogin yes
 PasswordAuthentication yes
 PermitEmptyPasswords no
@@ -100,12 +102,28 @@ ln -sfn /usr/lib/systemd/system/ssh.service \
     "$TARGET/etc/systemd/system/multi-user.target.wants/ssh.service"
 rm -f "$TARGET/etc/systemd/system/multi-user.target.wants/sshd.service"
 
-# This is `openssl passwd -6 -salt ds115j ds115j`, verified at build time.
-# Writing the known hash avoids depending on armhf binaries on this 16K host.
-HASH=$ROOT_HASH
+if [ ! -f "$TARGET/etc/shadow" ]; then
+    echo "No /etc/shadow in rootfs; cannot set its initial root password." >&2
+    exit 1
+fi
+if ! command -v openssl >/dev/null; then
+    echo "Need OpenSSL to set a unique initial root password." >&2
+    exit 1
+fi
+while :; do
+    read -r -s -p "Set the initial root password for the NAS: " password
+    printf '\n'
+    read -r -s -p "Repeat the password: " password_again
+    printf '\n'
+    if [ -n "$password" ] && [ "$password" = "$password_again" ]; then
+        break
+    fi
+    echo "Passwords must be non-empty and match. Try again." >&2
+done
+HASH=$(printf '%s' "$password" | openssl passwd -6 -stdin)
+unset password password_again
 export HASH
-if [ -f "$TARGET/etc/shadow" ]; then
-    python3 <<'PY'
+python3 <<'PY'
 import os
 from pathlib import Path
 path = Path(os.environ["TARGET"] + "/etc/shadow")
@@ -114,11 +132,9 @@ lines = [ln for ln in path.read_text().splitlines() if ln.strip() and not ln.sta
 lines.insert(0, f"root:{h}:1:0:99999:7:::")
 path.write_text("\n".join(lines) + "\n")
 PY
-    chown root:shadow "$TARGET/etc/shadow" 2>/dev/null || true
-    chmod 640 "$TARGET/etc/shadow"
-else
-    echo "WARN: no /etc/shadow yet; root password must be set on the NAS." >&2
-fi
+unset HASH
+chown root:shadow "$TARGET/etc/shadow"
+chmod 640 "$TARGET/etc/shadow"
 if [ -f "$TARGET/etc/passwd" ]; then
     python3 <<'PY'
 import os
@@ -136,28 +152,19 @@ PY
     chmod 0644 "$TARGET/etc/passwd"
 fi
 
-# SSH host key files are architecture-independent. Generate them with the
-# host ssh-keygen because armhf package postinst scripts did not run.
-# Use -A -f PREFIX (no chroot) so we never depend on TARGET/dev/null.
-if command -v ssh-keygen >/dev/null; then
-    ssh-keygen -A -f "$TARGET"
+# Generate fresh SSH host keys with the build host's ssh-keygen.
+if ! command -v ssh-keygen >/dev/null; then
+    echo "Need ssh-keygen on the Linux build host." >&2
+    exit 1
 fi
+rm -f "$TARGET"/etc/ssh/ssh_host_*
+ssh-keygen -A -f "$TARGET"
 
 # Kernel + HDD initramfs for later local U-Boot load (ide, not scsi).
 install -d "$TARGET/boot"
 for img in uImage-ds115j uRamdisk-hdd-ds115j; do
     install -m 0644 "$ROOT/boot/$img" "$TARGET/boot/$img"
 done
-
-if [ -d "$MODSRC" ]; then
-    echo "Installing $KVER modules into rootfs..."
-    rm -rf "$TARGET/lib/modules/$KVER"
-    mkdir -p "$TARGET/lib/modules"
-    cp -a "$MODSRC" "$TARGET/lib/modules/$KVER"
-    # Debian packages ship .ko.xz; depmod understands them.
-    # Host kmod can index the modules; no armhf execution.
-    depmod -b "$TARGET" "$KVER"
-fi
 
 cat > "$TARGET/etc/modules-load.d/ds115j.conf" <<'EOF'
 marvell
@@ -178,19 +185,19 @@ EOF
 cat > "$TARGET/root/README-ds115j.txt" <<'EOF'
 Debian trixie armhf for Synology DS115j (built off-device).
 
-Temporary root password: ds115j
-Change it: passwd
+The initial root password was selected when this root filesystem was built.
+Change it with `passwd` if this build is reused.
 
-First boot uses static 192.168.68.233/22. Run install-userspace.sh to enable
-DHCP plus the permanent .233 address on label eth0:1.
+First-boot network settings come from the repository's config files. Review
+them for your NAS and LAN before building this filesystem.
 
 This tree is meant for sda1 on the NAS HDD (U-Boot ide, not scsi).
 See the repository's docs/install-uart.md for the three-part disk layout.
 
-Kernel cmdline (U-Boot, do not saveenv until SPI is dumped):
+Kernel cmdline (U-Boot):
   console=ttyS0,115200 root=LABEL=rootfs rootwait rw
 
-Do not flash SPI. Do not run saveenv until an 8 MiB dump is safely copied off-device.
+Do not flash SPI or save U-Boot environment changes as part of routine setup.
 EOF
 
 echo "configure-rootfs: done"

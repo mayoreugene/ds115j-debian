@@ -4,6 +4,7 @@
 node_modules/
 linux/
 /rootfs-build/
+/rootfs-bootstrap.log
 rootfs-trixie-armhf.tar.gz
 /ds115j-install-kit.tar.gz
 /.tftp-root/

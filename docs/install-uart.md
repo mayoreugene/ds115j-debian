@@ -1,75 +1,58 @@
-# Install / reinstall with UART (manual)
+# Install Debian on a DS115j
 
-Two cases:
+Use these steps for a new disk or a reinstall. The process uses UART and TFTP;
+it does not require SPI changes. Read the [recovery warnings](landmines.md)
+before starting.
 
-1. **New DS115j** (stock DSM, blank disk, or unknown) → Debian.
-2. **Reinstall an existing device** without casually destroying its data partition.
+## Before you begin
 
-This page is the complete happy path. You do not need a helper machine, an
-agent, or another document: only this repository on the laptop, Internet
-access from the NAS for `apt`, and the UART/TFTP connection below.
+- A Linux computer or VM with this repository, Internet access, and the tools
+  listed in [build notes](build-artifacts.md). A Mac can serve the files after
+  the Linux build finishes.
+- A 3.3 V USB-UART adapter and an Ethernet connection between the NAS and
+  computer.
+- A backup of any data you need to keep. New-disk provisioning erases `/dev/sda`.
 
-## 0. Desk setup and hardware pinout
+Build the root filesystem before installation:
+
+```bash
+sudo scripts/reconstruct-rootfs.sh
+```
+
+The script asks you to choose the initial root password. The generated archive
+includes fresh SSH host keys. Do not reuse the old shared password from
+historical repository versions.
+
+## 1. Connect UART
 
 Replace placeholders such as `<NAS_IP>` and `<LAPTOP_IP>` in the commands
 below with addresses valid on your LAN. Review the network configuration under
-`config/` and adapt the target MAC address before installing. The repository
-scripts and configuration retain deployment defaults; this documentation does
-not change them.
+`config/` and adapt any device-specific defaults before installing.
 
 ```text
 UART:   115200 8N1
-        Console is UART0 / ttyS0. UART1 / ttyS1 is the PIC MCU — leave it alone.
-        Linux: sudo screen /dev/ttyACM0 115200  (or /dev/ttyUSB0)
-        macOS: screen /dev/cu.usbmodem* 115200 (or /dev/cu.usbserial*)
+       Console is UART0 / ttyS0. UART1 / ttyS1 is the PIC MCU — leave it alone.
+       Linux: sudo screen /dev/ttyACM0 115200  (or /dev/ttyUSB0)
+       macOS: screen /dev/cu.usbmodem* 115200 (or /dev/cu.usbserial*)
 NAS:    <NAS_IP> (or the address assigned by DHCP)
 Laptop: <LAPTOP_IP> — serves files from this repository
 ```
 
-The root filesystem uses a shared bootstrap credential. Treat it as public:
-log in through UART and set a unique root password before enabling SSH access
-on the LAN. Do not expose password-based root SSH to the Internet.
-
-### Motherboard UART Pinout (6-pin header next to fan connector)
-Remove the chassis cover. Next to the internal chassis fan connector on the PCB, there is a 6-pin header labeled on the silkscreen (often `JP1`, `JP2`, or `J2`):
-
-```text
-         (DS115j PCB Header)
-        ┌───────────┐
-  Pin 1 │  o     ●  │ Pin 2  ───►  GND  (Labeled on PCB)
-  Pin 3 │  o     ●  │ Pin 4  ───►  TX   (NAS Transmit, 3.3V TTL - middle pin)
-  Pin 5 │  o     ●  │ Pin 6  ───►  RX   (NAS Receive, 3.3V TTL - labeled on PCB)
-        └───────────┘
-```
-
-- **Pin 2 (GND):** Ground (labeled on board; continuous with chassis metal).
-- **Pin 4 (TX):** Transmit from NAS (3.3V logic level). Connects to adapter **RX**.
-- **Pin 6 (RX):** Receive into NAS (3.3V logic level). Connects to adapter **TX**.
-- **Pins 1, 3, 5:** **LEAVE UNCONNECTED** (VCC/power; the NAS and adapter are powered separately).
-
-### Using a Raspberry Pi Pico as a 3.3V USB-UART adapter
-You can use a cheap Raspberry Pi Pico as your serial adapter with the open-source [pico-uart-bridge](https://github.com/Noltari/pico-uart-bridge) firmware:
-1. Hold the Pico's `BOOTSEL` button while plugging it into your computer via USB.
-2. Drag-and-drop the `pico-uart-bridge.uf2` binary onto the `RPI-RP2` drive.
-3. Wire the Pico directly to the DS115j header (both operate at 3.3V logic levels):
-   - **Pico GND (Pin 23, 3, or 38)** $\longleftrightarrow$ **DS115j Pin 2 (GND)**
-   - **Pico GPIO17 / Pin 22 (UART0 RX)** $\longleftrightarrow$ **DS115j Pin 4 (TX)**
-   - **Pico GPIO16 / Pin 21 (UART0 TX)** $\longleftrightarrow$ **DS115j Pin 6 (RX)**
-   - **DO NOT connect 3.3V/VCC!**
-4. Connect to the resulting serial device (`/dev/ttyACM0` on Linux, `/dev/cu.usbmodem*` on Mac) at `115200 8N1`.
-
-Kill stale `screen` sessions before you start (`screen -ls`).
+See [Access](access.md) for the header pinout, Pico wiring, and serial-terminal
+details. Connect ground, TX, and RX only; leave VCC unconnected.
 
 **U-Boot disk is `ide`, not `scsi`.**
 
-**Never type `ide 0:1`.** This U-Boot **hangs**. Boot files are only on **`ide 0:2`** (`sda2`, 128 MiB ext2 `LABEL=boot`). Root is `sda1` (`LABEL=rootfs`). Data is `sda3` (`LABEL=data` → `/srv/data`).
+**Never type `ide 0:1`.** This U-Boot hangs. Boot files are on `ide 0:2`
+(`sda2`, ext2 `LABEL=boot`); root is `sda1` (`LABEL=rootfs`); data is `sda3`
+(`LABEL=data` → `/srv/data`).
 
 Never type `ide 0:1`, never set the fan to `0`, never run `ifdown eth0`, and
 never write SPI (`sf erase`, `sf write`, `bubt`, `fw_setenv`). The default
 boot method below does not use `saveenv`.
 
-Current good images (also in `boot/` of this repo). The `uImage-ds115j` is the
-**v2 with the USB VBUS fix** (`usb-regulator@2` on MPP44, always-on; no
+The checked-in kernel is the **v2 with the USB VBUS fix**
+(`usb-regulator@2` on MPP44, always-on; no
 `alarm-gpios`) verified live 2026-09-20 — this is the only image to deploy:
 
 ```text
@@ -78,9 +61,10 @@ uRamdisk-hdd-ds115j      SHA-256 dbbd30ec2c3772e2816eaa5e3295b0580a357fc93458dcb
 uRamdisk-recovery-ds115j SHA-256 cc9e6bc063a1247c3f370a87238f6ff544ff01ba145aed19f537b13d2810dd96
 ```
 
-## 1. Interrupt U-Boot
+## 2. Boot recovery
 
-Power on (or reboot). During the **3-second** countdown, hit a key → `Marvell>>`.
+Power on or reboot. During the **3-second** countdown, press **Ctrl+C in the
+UART terminal** to stop autoboot and reach `Marvell>>`.
 
 ```text
 Marvell>> printenv bootcmd
@@ -88,7 +72,7 @@ Marvell>> printenv bootcmd
 
 You are only going to **type** boot commands. Do not `saveenv`.
 
-## 2. Serve and TFTP the kernel from the laptop
+### Serve and TFTP the recovery image
 
 On the laptop, clone this repository and give its LAN interface an address
 reachable from the NAS. Before installation, check whether
@@ -128,10 +112,12 @@ cat /proc/partitions
 
 ### Fast-track: Automated single-command install (New or wipe disk)
 
-If you have started the HTTP server on your laptop (`scripts/reconstruct-rootfs.sh && python3 -m http.server 45152 --bind 0.0.0.0`), you can perform steps 3, 4, and 5 in **one single command** inside BusyBox recovery:
+If you built the rootfs before booting and started the HTTP server (see §4),
+you can provision a new or intentionally wiped disk with one command:
 
 ```sh
-wget -qO- http://<LAPTOP_IP>:45152/scripts/provision-hdd.sh | sh
+wget -qO- http://<LAPTOP_IP>:45152/scripts/provision-hdd.sh \
+  | sh -s -- <LAPTOP_IP>
 ```
 
 This automated script will:
@@ -205,26 +191,18 @@ mkfs.ext4 -L data   /dev/sda3
 
 ## 4. Install Debian userspace onto `sda1`
 
-The complete rootfs is in Git as two files below 95 MB. On the laptop,
-reconstruct it and serve the repository over HTTP:
+Build the rootfs on a Linux computer as described in [Build notes](build-artifacts.md).
+Then start an HTTP server from the repository root:
 
 ```bash
 cd /path/to/ds115j
-scripts/reconstruct-rootfs.sh
-python3 -m http.server 45152 --bind 0.0.0.0 --directory "$PWD"
+python3 -m http.server 45152 --bind <LAPTOP_IP> --directory "$PWD"
 ```
 
-This serves the repository over plain HTTP to every reachable network interface,
-including the tracked rootfs payload, which contains shared bootstrap
-credentials and SSH host private keys. Use only on a trusted, isolated LAN and
-stop the server when installation is complete; do not expose it to the Internet
-or an untrusted network. See the security warning in the [README](../README.md).
-
-The reconstruction script verifies SHA-256
-`9d869bf8f45f6f3908097aece847bb2d1bde4a6213801cb8460cdb83f9a30eb6`
-and also creates `ds115j-install-kit.tar.gz`. Run HTTP in a second laptop
-terminal (or stop TFTP after recovery has booted); keep UART in its own
-terminal.
+Bind the server to the laptop's LAN address, not `0.0.0.0`. Plain HTTP exposes
+the generated rootfs and install kit to devices on that network. Use a trusted
+LAN and stop the server when installation is complete. Keep the server in a
+second terminal and UART in its own terminal.
 Then, from recovery:
 
 ```sh
@@ -250,7 +228,7 @@ yet have a DHCP client), interface naming, `LABEL=data` at `/srv/data`, and
 Debian trixie, updates, and security repositories. Check that the selected
 configuration matches your LAN before booting.
 
-The shipped rootfs already includes the
+The generated rootfs already includes the
 `6.12.107+deb13-armmp` module tree matching `boot/uImage-ds115j`. Do not replace
 it with a newer ABI during installation. Continue with §5.
 
@@ -287,11 +265,9 @@ setenv bootargs 'console=ttyS0,115200 earlyprintk root=LABEL=rootfs rootwait rw 
 bootm 0x01000000 0x02000000
 ```
 
-Log in over UART with the bootstrap credentials configured for this rootfs.
-Set a unique root password before allowing SSH access from the LAN. Wait for
-the one-time Debian second stage
-to finish, confirm Internet works, fetch the version-matched kit from the
-laptop HTTP server, and run the installer:
+Log in over UART with the root password selected during the rootfs build. Wait
+for the one-time Debian second stage to finish, confirm Internet works, fetch
+the version-matched kit from the laptop, and run the installer:
 
 ```sh
 while [ ! -e /etc/ds115j-second-stage-done ]; do
