@@ -94,15 +94,17 @@ The former Raspberry Pi at `192.168.68.250` was used during bring-up. It is
 optional and may be deleted. No installation, recovery, artifact, or script in
 this repository requires it.
 
-## Disk identifiers (do not reformat)
+## Disk layout (do not reformat)
 
 ```text
 sda1  64G   ext4  LABEL=rootfs  UUID=fc9ea304-14d5-4494-a117-7dfda838e18b  /
 sda2  128M  ext2  LABEL=boot    UUID=eec9c4e3-7c83-40b6-af29-e28c4f228baa  (U-Boot source; not mounted in Linux by default)
-~1.75 TiB unallocated
+sda3  ~1.8T ext4  LABEL=data   UUID=2fd25b2a-ceb7-4155-bde9-87dec3d66e2b  /srv/data
 ```
 
-Physical sector size 4096; both partitions currently start off a 4 KiB boundary (`sda1` start 63).
+This is the recorded live layout; verify device names and labels before any
+disk operation. The original root partition starts at sector 63, so it is not
+aligned to a 4 KiB boundary.
 
 ## Live NAS listeners (2026-09-15 19:50 UTC)
 

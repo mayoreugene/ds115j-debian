@@ -1,6 +1,11 @@
-# REBOOT VERIFY — DS115j daily-ready (2026-09-16)
+# Reboot verification — DS115j daily-ready (2026-09-16)
 
-> **⚠ 2026-09-20 UPDATE:** this protocol verified uImage `5ea71e0b…` (no `alarm-gpios`, **no USB fix**). On 2026-09-20 the deployed uImage on sda2/TFTP was **replaced by the v2 with the USB VBUS fix** (`usb-regulator@2` on MPP44, always-on) — SHA-256 `6b58d6eee97005845923167d5fe481035b7031195935bd632cdbe29ae75ed0f6` (6,060,530 B). All rows below that quote `5ea71e0b…` describe the pre-fix state; `boot/`, `README.md`, `docs/install-uart.md` and `docs/landmines.md` now reference the v2 image. Firmware set identity (no `alarm-gpios`, `dbbd30ec…` ramdisk, `qnap-poweroff-ds115j`) is unchanged.
+> **Update (2026-09-20):** this protocol originally verified uImage
+> `5ea71e0b…` (no USB fix). The deployed image was subsequently replaced by
+> the v2 image with the USB VBUS fix (`usb-regulator@2` on MPP44, always-on),
+> SHA-256 `6b58d6eee97005845923167d5fe481035b7031195935bd632cdbe29ae75ed0f6`
+> (6,060,530 B). Rows below that mention `5ea71e0b…` describe the earlier
+> image. The current repository boot set is listed in the [README](../README.md).
 
 **When:** 2026-09-16 **11:58–12:06 UTC**  
 **NAS:** `ssh root@192.168.68.233`  
@@ -15,7 +20,7 @@
 | Pre-reboot read-only baseline | **yes** 11:58:34 UTC | uptime 1h03 from boot 10:55 UTC; hashes/services/fan/LED/mounts/net captured |
 | `reboot` | **yes** issued 11:58:57 UTC; ping dropped 11:59:03; SSH back 12:00:53 UTC | boot timestamp **2026-09-16 11:59 UTC** |
 | True PSU cut (`poweroff` + front button) | **no** | `qnap_poweroff_ds115j` cuts PSU; **nobody is at the box to press the button**. WOL not usable (`ethtool` printed no Wake-on-LAN lines). Leaving the NAS off would strand it. |
-| Historical PSU cold | already proven ~09:32 UTC same day | see `MUST-FIXES.md` MUST-10 |
+| Historical PSU cold | reported as proven at about 09:32 UTC the same day | see the dated [live-state notes](current-state.md) |
 
 **Owner one-liner if they want PSU-cut proof again:** stand at the DS115j, `ssh root@192.168.68.233` → `poweroff`, wait for PSU cut, press the **front power button**, confirm SSH on `.233`. Do not run `poweroff` remotely with no one at the chassis.
 

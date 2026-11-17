@@ -2,7 +2,9 @@
 
 Goal: **restore bootability or get back onto the running system** using U-Boot + local `ide 0:2` and/or laptop TFTP, **without ever** probing `ide 0:1`, writing SPI (`sf`/`saveenv`/`bubt`/`fw_setenv`), or reformatting. Last resort vs. bricking: keep U-Boot env untouched, boot from known-good images.
 
-## Access (full: ACCESS.md)
+## Access
+
+See the [access guide](access.md) for UART, network, and laptop setup.
 
 | Role | DNS / IP | UART / TFTP |
 |---|---|---|
@@ -58,7 +60,8 @@ ext2load ide 0:2 0x01000000 /boot/uImage-ds115j.pre-noalarm-20260916
 ext2load ide 0:2 0x02000000 /boot/uRamdisk-hdd-ds115j
 bootm 0x01000000 0x02000000
 ```
-The current images are booted with the same flow, `/boot/uImage-ds115j` + `/boot/uRamdisk-hdd-ds115j` (see ACCESS.md conceptual bootcmd).
+The current images are booted with the same flow, `/boot/uImage-ds115j` +
+`/boot/uRamdisk-hdd-ds115j` (see the conceptual boot command in [access.md](access.md)).
 
 If boot completes, promote the rollback image later (Section E) using `deploy-boot.sh prev`.
 

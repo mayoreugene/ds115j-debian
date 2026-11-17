@@ -8,7 +8,8 @@ This board’s U-Boot **hangs** on `ide 0:1` (including `ext2ls` / `ext2load`).
 
 Use **only `ide 0:2`** (the 128 MiB ext2 `LABEL=boot` partition).
 
-Older docs (`permanent-boot.md`, `next-stage-boot.md`, some internals) still show `ide 0:1`. Treat those lines as **historical**, not commands.
+Do not copy commands from old bring-up notes that use `ide 0:1`; they are
+historical, not commands for this device.
 
 Do not run **`scsi`** commands. This U-Boot is **`ide`**.
 
@@ -25,14 +26,15 @@ Dump (do not overwrite):
 ```text
 /root/ds115j/backups/spi/ds115j-spi-8m-20260915-124830.bin
 SHA-256 cfbdc0dd57e3949957dbab23eb6befe84112fc36ed3b8a4e142c9ad78239dfc4
-HANDOFF copy: /root/ds115j/HANDOFF/artifacts/spi/
 ```
 
 ## 3. Do not wipe or move `sda1` / `sda2`
 
 - `sda1` = Debian root (`LABEL=rootfs`).
 - `sda2` = **U-Boot boot files**. Moving/reformatting/renumbering it unboots the NAS.
-- `scripts/extract-hdd.sh` **destroys `/dev/sda`**. Never run it on the live NAS.
+- The legacy `scripts/extract-hdd.sh` recipe **destroys `/dev/sda`** and makes a
+  single-partition layout. It is retained for historical recovery workflows;
+  never run it on the live NAS.
 - New data volume must use **unallocated** space only.
 
 Linux `/boot` on `sda1` is **not** what U-Boot reads. U-Boot reads **`sda2:/boot`**.
@@ -67,9 +69,9 @@ Root password SSH on this **trusted LAN** is an accepted preference.
 
 - Do not silently switch to key-only or delete root login.
 - Do not expose SSH to the Internet.
-- `usable-system-gaps.md` argues for locking SSH down; **ai-handoff / owner preference overrides that** unless the owner changes their mind.
+- Keep SSH restricted to the trusted LAN; do not expose it to the Internet.
 
-## 6. 256 MiB RAM is a hard ceiling
+## 7. 256 MiB RAM is a hard ceiling
 
 - Available RAM ~233 MiB; **no swap** as of the 2026-09-15 probe.
 - Use **modest zram**, not a large HDD swap file as default.

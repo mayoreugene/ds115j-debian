@@ -145,7 +145,10 @@ If you prefer to perform each step by hand or need to preserve `/srv/data` on `s
 
 ### 3a. Reinstall **this** device (keep data if you can)
 
-**Do not** `dd` the whole disk. **Do not** run `scripts/extract-hdd.sh` (it wipes `sda` and creates a **single** partition — stale).
+**Do not** `dd` the whole disk or use the old `extract-hdd.sh` recipe (it
+wipes `sda` and creates a **single** partition). It remains in the repository
+for historical recovery workflows; use the guided steps below or the
+documented provisioner instead.
 
 Live layout (2 TB WD Red) is snapshotted in `config/sda.sfdisk`:
 

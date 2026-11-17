@@ -1,108 +1,91 @@
-# DS115j Debian install kit
+# Synology DS115j on Debian
 
-Bring a **Synology DS115j** (Marvell Armada 370, 256 MiB RAM) to the same **Debian 13 (trixie) armhf daily-ready** state as the live box on this LAN, or **reinstall this one**.
+Install and operate Debian 13 (trixie, armhf) on the Synology DS115j
+(Marvell Armada 370, 256 MiB RAM). This repository contains the boot files,
+root filesystem payload, configuration, scripts, and recovery notes for the
+device.
 
-This is a self-contained UART + TFTP + HDD kit. A fresh clone contains the
-known-good boot artifacts and the complete Debian rootfs payload.
+> **Start here:** follow the complete [UART installation and reinstall guide](docs/install-uart.md).
+> It uses the supported, non-persistent U-Boot boot path and does not require
+> SPI changes.
 
-**For a complete helper-free daily-ready install or reinstall, follow only [docs/install-uart.md](docs/install-uart.md).**
+## What is included
 
-## Daily-ready scope (2026-09-16)
+The kernel image, ramdisks, and power-off module are a compatible set. Use the
+files in `boot/` and `modules/` together; the kernel ABI is
+`6.12.107+deb13-armmp`.
 
-HDD boot from `ide 0:2`, SSH, DHCP + permanent `.233`, RGMII Ethernet, MCU LEDs/beep, temperature fan, SMART → bay amber only on failure, 10-minute HDD spin-down, zram, chrony, `qnap_poweroff_ds115j` PSU cut. Samba/backups/nftables are **out of scope**.
+| File | SHA-256 | Purpose |
+|---|---|---|
+| `boot/uImage-ds115j` | `6b58d6eee97005845923167d5fe481035b7031195935bd632cdbe29ae75ed0f6` | Current kernel with appended DTB and USB VBUS fix |
+| `boot/uRamdisk-hdd-ds115j` | `dbbd30ec2c3772e2816eaa5e3295b0580a357fc93458dcb3bf063bf7bf65cd75` | HDD boot; mounts `LABEL=rootfs` |
+| `boot/uRamdisk-recovery-ds115j` | `cc9e6bc063a1247c3f370a87238f6ff544ff01ba145aed19f537b13d2810dd96` | BusyBox recovery environment |
 
-Live probe: [docs/current-state.md](docs/current-state.md). Cold-boot checklist: [docs/cold-boot-verify.md](docs/cold-boot-verify.md).
-
-## Access (trusted LAN only)
-
-| Role | Address | Login |
-|------|---------|--------|
-| NAS | `192.168.68.233` (or DHCP) | `ssh root@<NAS-IP>` password `ds115j` |
-| Laptop (TFTP/HTTP) | example `192.168.68.251` (or local IP) | run `scripts/serve-tftp.sh` and python HTTP |
-| UART | `115200 8N1` (3.3V TTL) | Linux: `sudo screen /dev/ttyACM0 115200` / Mac: `screen /dev/cu.usbmodem* 115200` |
-
-*(Tip: You can use a Raspberry Pi Pico as a 3.3V USB-UART adapter with [pico-uart-bridge](https://github.com/Noltari/pico-uart-bridge)).*
-
-Full notes: [docs/access.md](docs/access.md).
-
-## Current good boot files
-
-Verify after copy:
+Check the boot files from the repository root:
 
 ```bash
-cd boot && (sha256sum -c SHA256SUMS 2>/dev/null || shasum -a 256 -c SHA256SUMS)
+(cd boot && shasum -a 256 -c SHA256SUMS)
 ```
 
-| File | SHA-256 (full) | Role |
-|------|----------------|------|
-| `boot/uImage-ds115j` | `6b58d6eee97005845923167d5fe481035b7031195935bd632cdbe29ae75ed0f6` | Kernel + **appended DTB, no `alarm-gpios`, USB VBUS fix (`usb-regulator@2` on MPP44, always-on)** — the v2 image verified live on 2026-09-20; **this is the only image to deploy** |
-| `boot/uRamdisk-hdd-ds115j` | `dbbd30ec2c3772e2816eaa5e3295b0580a357fc93458dcb3bf063bf7bf65cd75` | Initramfs → `LABEL=rootfs` |
-| `boot/uRamdisk-recovery-ds115j` | `cc9e6bc063a1247c3f370a87238f6ff544ff01ba145aed19f537b13d2810dd96` | BusyBox recovery (fsck) |
-
-Kernel / ramdisk / `modules/qnap-poweroff-ds115j.ko` are **one set**. Vermagic: `6.12.107+deb13-armmp`. Do not `apt upgrade` the kernel as a routine update.
-
-Board DTS (good): `dts/ds115j.dts` SHA `89bc51c8…` — includes the `usb-regulator@2` (MPP44, always-on) VBUS fix. The file `dts/ds115j.dts.stale-with-alarm-gpios` is labelled **do not build**.
-
-## Layout
-
-```
-docs/install-uart.md   NEW DEVICE + REINSTALL (manual UART)
-docs/landmines.md      never ide 0:1, never casual saveenv, …
-docs/recovery.md       TFTP / sda2 rollback
-docs/led-behaviour.md
-docs/smart-amber-led.md
-docs/disk-idle.md
-docs/current-state.md
-scripts/               MCU, fan, SMART amber, deploy-boot, bootstrap
-dts/                   good DTS/DTB
-boot/                  uImage + ramdisks
-firmware/spi/          8 MiB SPI dump (unbrick reference; do not rewrite SPI)
-modules/               qnap_poweroff_ds115j.ko + source
-rootfs/                split Debian rootfs archive (<95 MB per Git object)
-config/                interfaces, smartd, systemd examples from the live NAS
-HANDOFF/               historical bring-up notes
-```
-
-## Landmines (read before any U-Boot)
-
-- **Never** `ide 0:1` (hangs). Boot files live on **`ide 0:2`** (`sda2`).
-- **Never** casual `saveenv` / `sf write` / `bubt` / `fw_setenv` (env sits inside stock zImage in SPI).
-- Do not run `scripts/extract-hdd.sh` on the **live** NAS — it wipes `/dev/sda` and is a **stale single-partition** recipe.
-- Do not attach `disk-activity` to the bay amber LED.
-
-Full list: [docs/landmines.md](docs/landmines.md).
-
-## Rootfs included in git
-
-GitHub rejects individual files over 100 MB, so the 134,385,614-byte archive
-is committed as two ordinary Git files:
-
-| File | Bytes | SHA-256 |
-|---|---:|---|
-| `rootfs/rootfs-trixie-armhf.tar.gz.part-aa` | 94,371,840 | `4aa9576e09e41004156dafaa488819413f21240a5ec137869597566f8e35f9b3` |
-| `rootfs/rootfs-trixie-armhf.tar.gz.part-ab` | 40,013,774 | `d224d7238803be805a440f27f339c012146beac492808bdaa4b9c51d279b744d` |
-
-Reconstruct and verify the original archive:
+The Debian root filesystem is stored as two Git-friendly parts under `rootfs/`.
+Reconstruct and verify the archive, and create the matching userspace install
+kit, with:
 
 ```bash
 scripts/reconstruct-rootfs.sh
-# rootfs-trixie-armhf.tar.gz SHA-256:
-# 9d869bf8f45f6f3908097aece847bb2d1bde4a6213801cb8460cdb83f9a30eb6
 ```
 
-No Git LFS client or helper host is required. To rebuild from Debian mirrors
-instead, a Linux machine with `mmdebstrap` can run
-`sudo scripts/bootstrap-rootfs.sh`.
+The generated archives are ignored by Git. They are required by the documented
+install flow and can be recreated from the tracked files.
 
-First-boot `dpkg --configure -a` and `apt-get` **need Internet on the NAS**.
+## Documentation
 
-## Laptop serving
+| Topic | Guide |
+|---|---|
+| Install or reinstall | [UART install guide](docs/install-uart.md) |
+| Recovery and boot rollback | [Recovery runbook](docs/recovery.md) |
+| Critical hardware and boot warnings | [Landmines](docs/landmines.md) |
+| UART, network, and laptop setup | [Access](docs/access.md) |
+| Current recorded device status | [Live-state notes](docs/current-state.md) |
+| Reboot verification record | [Cold-boot verification](docs/cold-boot-verify.md) |
+| Power button and MCU | [Power button](docs/power-button.md) |
+| LEDs | [LED behavior](docs/led-behaviour.md), [SMART amber LED](docs/smart-amber-led.md) |
+| HDD power management | [Disk idle](docs/disk-idle.md) |
+| USB VBUS hardware fix | [USB VBUS fix](docs/usb-vbus-fix.md) |
+| Optional configuration | [Optional tweaks](docs/optional-tweaks.md) |
+| Debian versus DSM features | [OS feature comparison](docs/dsm-os-features.md) |
 
-Give the laptop a LAN address such as `192.168.68.251/22`, then run:
+The live-state and verification documents are dated records, not a guarantee
+that the NAS or TFTP server still has the same state. Recheck the device before
+relying on a recorded result.
 
-```bash
-scripts/serve-tftp.sh
-```
+## Repository layout
 
-The script stages and serves the three files in `boot/`. The former Raspberry
-Pi helper is historical and optional; installation and recovery do not use it.
+- `boot/` — deployable kernel and ramdisks, with checksums.
+- `config/` — system configuration and service files used by the installer.
+- `dts/` — current board source and its matching DTB.
+- `docs/` — installation, recovery, operation, and verification guides.
+- `firmware/spi/` — read-only vendor firmware and supporting forensics.
+- `modules/` — source and matching `qnap_poweroff_ds115j` kernel module.
+- `rootfs/` — split Debian root filesystem archive and checksums.
+- `scripts/` — provisioning, deployment, and device support tools.
+
+## Safety essentials
+
+- U-Boot boot files are on `ide 0:2` (`sda2`). **Never probe `ide 0:1`**; it
+  hangs this device.
+- Do not casually run `saveenv`, `sf write`, `bubt`, or `fw_setenv`. The U-Boot
+  environment shares SPI space with the stock kernel.
+- `scripts/extract-hdd.sh` is a destructive legacy utility retained for
+  historical recovery workflows; do not run it on the live NAS.
+- Do not attach disk-activity triggers to the bay's amber fault LED.
+
+See the full [landmines list](docs/landmines.md) before using U-Boot or changing
+the boot chain.
+
+## Scope
+
+The documented daily-ready setup covers HDD boot, SSH/networking, MCU LEDs and
+beeper, temperature-based fan control, SMART fault indication, HDD idle
+spindown, zram, time synchronization, and controlled power-off. Samba, backup
+services, nftables, and burn-in testing are intentionally out of scope.

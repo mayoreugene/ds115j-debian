@@ -1,6 +1,11 @@
-# CURRENT-STATE — live NAS probe
+# Live system status notes
 
-**When:** 2026-09-16 **12:06 UTC** after **`reboot`** (boot **11:59 UTC**). Full checklist: [`COLD-BOOT-VERIFY.md`](COLD-BOOT-VERIFY.md). Prior MUST-12 hysteresis 11:31 UTC; independent audit 11:22 UTC: [`FULL-MUST-AUDIT.md`](FULL-MUST-AUDIT.md).
+> This is a dated record, not a live health check. The detailed baseline below
+> was captured on 2026-09-16; later observations were added through
+> 2026-09-21. Recheck the NAS before relying on any status or network address.
+
+**Baseline:** 2026-09-16 at 12:06 UTC, after `reboot` (boot 11:59 UTC).
+See the [reboot verification record](cold-boot-verify.md) for the checklist.
 
 ## Verdict snapshot
 
@@ -55,7 +60,7 @@ Live sample **12:02:33–12:05:51 UTC** (12 polls): **pwm=145 / target=1500** at
 
 - Live/sda2/TFTP default: **`5ea71e0b…`** (6,060,176 B), no `alarm-gpios`.
 - TFTP keep: `uImage-ds115j.pre-alarm-gpios-c1688fda` = `c1688fda…`.
-- HANDOFF `artifacts/ds115j.dts` SHA `89bc51c8…` = live DTS (no alarm).
+- Repository source `dts/ds115j.dts` SHA `89bc51c8…` = live DTS (no `alarm-gpios`).
 
 ## Identity (boot 2026-09-16 11:59 UTC)
 
@@ -97,7 +102,7 @@ sda3  1.8T ext4  LABEL=data    UUID=2fd25b2a-ceb7-4155-bde9-87dec3d66e2b  /srv/d
   `/usr/local/sbin/syno-powerbtn-arm.sh`.
 - `syno-mcu-boot-begin.service` 11:59:35 blink + orange steady; `syno-mcu-boot.service` 12:00:06 ready + beep.
 - `/usr/local/sbin/syno-fan.sh` + `syno-fan.service` (wait-loop proven this boot).
-- Bay LED: `synology:amber:disk` **`trigger=none`, `brightness=0`** while healthy. smartd now runs `/usr/local/sbin/smart-amber-led.sh` for SMART health/attribute failures; `smart-amber-led.timer` reconciles every 15 minutes and clears recovered conditions. The 11:31 UTC `disk-activity` udev rule remains **removed**. Green is hardware SATA. See [`SMART-AMBER-LED.md`](SMART-AMBER-LED.md).
+- Bay LED: `synology:amber:disk` **`trigger=none`, `brightness=0`** while healthy. smartd now runs `/usr/local/sbin/smart-amber-led.sh` for SMART health/attribute failures; `smart-amber-led.timer` reconciles every 15 minutes and clears recovered conditions. The 11:31 UTC `disk-activity` udev rule remains **removed**. Green is hardware SATA. See [SMART amber LED](smart-amber-led.md).
 
 ### LED map (front panel)
 
